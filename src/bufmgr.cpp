@@ -16,9 +16,18 @@
 //--------------------------------------------------------------------
 BufMgr::BufMgr(int bufSize, const char* replacementPolicy)
 {
-	//TODO: add your code here
-}
+	numFrames = bufSize;
+	frames = new Frame [numFrames];
+	
+	if (strcmpi(replacementPolicy, "LRU") == 0) 
+		replacer = new LRU();
+	else
+		replacer = new MRU();
 
+	totalCall = 0;
+	totalHit = 0;
+	numDirtyPageWrites = 0;
+}
 
 //--------------------------------------------------------------------
 // Destructor for BufMgr
