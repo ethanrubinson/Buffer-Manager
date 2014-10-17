@@ -37,7 +37,9 @@ BufMgr::BufMgr(int bufSize, const char* replacementPolicy)
 //--------------------------------------------------------------------
 BufMgr::~BufMgr()
 {   
-	//TODO: add your code here
+	FlushAllPages();
+	delete [] frames;
+	delete replacer;
 }
 
 //--------------------------------------------------------------------
