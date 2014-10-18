@@ -65,6 +65,9 @@ BufMgr::~BufMgr()
 Status BufMgr::PinPage(PageID pid, Page*& page, bool isEmpty)
 {
 	//std::cout << "Pin PageID " << pid << std::endl;
+
+	if(pid == INVALID_PAGE) return FAIL;
+
 	totalCall++;
 
 	// Check if the page is in the buffer pool
@@ -72,7 +75,7 @@ Status BufMgr::PinPage(PageID pid, Page*& page, bool isEmpty)
 	Frame* currFrame;
 	for (int iter = 0; iter < numFrames; iter++) {
 		currFrame = &frames[iter];
-		if (currFrame->IsValid() && currFrame->GetPageID() == pid){
+		if (currFrame->GetPageID() == pid){
 			inPool = true;
 			totalHit++;
 			break;
@@ -100,17 +103,20 @@ Status BufMgr::PinPage(PageID pid, Page*& page, bool isEmpty)
 		
 			// Find a page to evict based on our replacement policy
 			int replacedPageID = replacer->PickVictim();
-			if(FlushPage(replacedPageID) != OK) { 
-				page = NULL;
-				return FAIL;
-			}
+			////std::cout << "Want to evict page: " << replacedPageID << std::endl;
 
-			// Get a pointer to the frame we just flushed
+			// Get a pointer to the frame we will flush
 			for (int iter = 0; iter < numFrames; iter++) {
 				currFrame = &frames[iter];
-				if (currFrame->IsValid() && currFrame->GetPageID() == replacedPageID){
+				if (currFrame->GetPageID() == replacedPageID){
 					break;
 				}
+			}
+
+			if(FlushPage(replacedPageID) != OK) { 
+				////std::cout << "Failed to flush victim page" << std::endl;
+				page = NULL;
+				return FAIL;
 			}
 		}
 
@@ -119,6 +125,7 @@ Status BufMgr::PinPage(PageID pid, Page*& page, bool isEmpty)
 
 		// If the page is not empty, read it in from disk
 		if (!isEmpty && currFrame->Read(pid) != OK) {
+			////std::cout << "failed to read" << std::endl;
 			page = NULL;
 			return FAIL;
 		}
@@ -127,6 +134,9 @@ Status BufMgr::PinPage(PageID pid, Page*& page, bool isEmpty)
 		page = currFrame->GetPage();
 	}
 
+	// Now that the frame is pinned we need to remove it from the ones that can be evicted
+	replacer->RemoveFrame(currFrame->GetPageID());
+	////std::cout << "pinned page: " << currFrame->GetPageID() <<std::endl;
 	return OK;
 } 
 
@@ -146,7 +156,8 @@ Status BufMgr::PinPage(PageID pid, Page*& page, bool isEmpty)
 //--------------------------------------------------------------------
 Status BufMgr::UnpinPage(PageID pid, bool dirty)
 {
-	//std::cout << "Unpinning page  " << pid << " Dirty?: " << dirty << std::endl;
+	//std::cout << "Unin PageID " << pid << std::endl;
+	////std::cout << "Unpinning page  " << pid << " Dirty?: " << dirty << std::endl;
 	int frameIndex = FindFrame(pid);
 	if (frameIndex == INVALID_FRAME) return FAIL;
 
@@ -156,6 +167,8 @@ Status BufMgr::UnpinPage(PageID pid, bool dirty)
 	if (dirty) targetFrame->DirtyIt();
 
 	targetFrame->Unpin();
+
+	if (targetFrame->NotPinned()) replacer->AddFrame(targetFrame->GetPageID());
 
 	return OK;
 }
@@ -181,6 +194,7 @@ Status BufMgr::UnpinPage(PageID pid, bool dirty)
 //--------------------------------------------------------------------
 Status BufMgr::NewPage (PageID& firstPid, Page*& firstPage, int howMany)
 {
+	//std::cout << "New Page Request for " << howMany << " pages." << std::endl;
 	// Condition Checks
 	if (howMany <= 0) return FAIL;
 
@@ -188,21 +202,25 @@ Status BufMgr::NewPage (PageID& firstPid, Page*& firstPage, int howMany)
 	Frame* currFrame;
 	for (int iter = 0; iter < numFrames; iter++) {
 		currFrame = &frames[iter];
-		if (!currFrame->IsValid()){
+		if (!currFrame->IsValid() || currFrame->NotPinned()){
 			foundEmptyFrame = true;
 			break;
 		}
 	}
-
+	//std::cout << "Found empty frame? " << ((foundEmptyFrame) ? "yes" : "no") << "." << std::endl;
 	if (!foundEmptyFrame) return FAIL;
 
 	// Allocate the pages
+
+	//std::cout << "Allocating" << std::endl;
 
 	if (MINIBASE_DB->AllocatePage(firstPid, howMany) != OK) {
 		firstPid = INVALID_PAGE;
 		firstPage = NULL;
 		return FAIL;
 	}
+
+	//std::cout << "Allocated " << howMany << " pages with fristPid = " << firstPid << std::endl;
 
 	if (PinPage(firstPid,firstPage,true) != OK) {
 		MINIBASE_DB->DeallocatePage(firstPid, howMany);
@@ -211,7 +229,7 @@ Status BufMgr::NewPage (PageID& firstPid, Page*& firstPage, int howMany)
 		return FAIL;
 	}
 
-
+	//std::cout << "Allocated " << howMany << " new pages and pinned pageID: " << firstPid << std::endl;
 	return OK;
 }
 
@@ -233,11 +251,12 @@ Status BufMgr::NewPage (PageID& firstPid, Page*& firstPage, int howMany)
 //--------------------------------------------------------------------
 Status BufMgr::FreePage(PageID pid)
 {
-	//std::cout << "Free page:  " << pid << std::endl;
+	//std::cout << "Free PageID " << pid << std::endl;
+	////std::cout << "Free page:  " << pid << std::endl;
 
 	Frame* targetFrame;
 	int frameIndex = FindFrame(pid);
-	if (frameIndex != INVALID_PAGE) {
+	if (frameIndex != INVALID_FRAME) {
 		targetFrame = &frames[frameIndex];
 
 		if (targetFrame->GetPinCount() > 1) return FAIL;
@@ -267,7 +286,8 @@ Status BufMgr::FreePage(PageID pid)
 //--------------------------------------------------------------------
 Status BufMgr::FlushPage(PageID pid)
 {
-	//std::cout << "Flush Page  " << pid << std::endl;
+	//std::cout << "Flush Page" << pid << std::endl;
+	////std::cout << "Flush Page  " << pid << std::endl;
 	int frameIndex = FindFrame(pid);
 	if (frameIndex == INVALID_FRAME) return FAIL;
 
@@ -279,8 +299,9 @@ Status BufMgr::FlushPage(PageID pid)
 		numDirtyPageWrites++;
 	}
 	
+	replacer->RemoveFrame(targetFrame->GetPageID());
 	targetFrame->EmptyIt();
-
+	//std::cout << "Flush OK " << std::endl;
 	return OK;
 } 
 
@@ -298,6 +319,7 @@ Status BufMgr::FlushPage(PageID pid)
 
 Status BufMgr::FlushAllPages()
 {
+	//std::cout << "Flush all " << std::endl;
 	bool failedOnce = false;
 	Frame* currFrame;
 	for (int iter = 0; iter < numFrames; iter++) {
@@ -308,11 +330,12 @@ Status BufMgr::FlushAllPages()
 				failedOnce = true;
 			}
 
-				if (currFrame->IsDirty()){
-					if (currFrame->Write() != OK) failedOnce = true;
-					numDirtyPageWrites++;
-				}
+			if (currFrame->IsDirty()){
+				if (currFrame->Write() != OK) failedOnce = true;
+				numDirtyPageWrites++;
+			}
 
+			replacer->RemoveFrame(currFrame->GetPageID());
 			currFrame->EmptyIt();
 		}
 	}
@@ -361,7 +384,7 @@ int BufMgr::FindFrame( PageID pid )
 	Frame* currFrame;
 	for (int iter = 0; iter < numFrames; iter++) {
 		currFrame = &frames[iter];
-		if (currFrame->IsValid() && currFrame->GetPageID() == pid) {
+		if (currFrame->GetPageID() == pid) {
 			return iter;
 		}
 	}
