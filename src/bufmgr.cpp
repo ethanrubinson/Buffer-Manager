@@ -190,6 +190,9 @@ Status BufMgr::FreePage(PageID pid)
 }
 
 
+
+
+
 //--------------------------------------------------------------------
 // BufMgr::FlushPage
 //
@@ -204,8 +207,17 @@ Status BufMgr::FreePage(PageID pid)
 //--------------------------------------------------------------------
 Status BufMgr::FlushPage(PageID pid)
 {
-	//TODO: add your code here
-	return FAIL;	
+	int frameIndex = FindFrame(pid);
+	if (frameIndex == INVALID_FRAME) return FAIL;
+
+	Frame targetFrame = frames[frameIndex];
+	if(!targetFrame.IsValid() || !targetFrame.NotPinned()) return FAIL;
+
+	if (targetFrame.IsDirty() && targetFrame.Write() != OK) return FAIL;
+
+	targetFrame.EmptyIt();
+
+	return OK;
 } 
 
 //--------------------------------------------------------------------
@@ -222,8 +234,22 @@ Status BufMgr::FlushPage(PageID pid)
 
 Status BufMgr::FlushAllPages()
 {
-	//TODO: add your code here
-	return FAIL;
+	bool failedOnce = false;
+	Frame currFrame;
+	for (int iter = 0; iter < numFrames; iter++) {
+		currFrame = frames[iter];
+		if (currFrame.IsValid()) {
+			// Check that the frame is not pinned
+			if (!currFrame.NotPinned()){
+				failedOnce = true;
+			}
+
+			if (currFrame.IsDirty() && currFrame.Write() != OK) failedOnce = true;
+
+			currFrame.EmptyIt();
+		}
+	}
+	return (failedOnce) ? FAIL : OK;
 }
 
 
@@ -240,8 +266,15 @@ Status BufMgr::FlushAllPages()
 //--------------------------------------------------------------------
 unsigned int BufMgr::GetNumOfUnpinnedFrames()
 {
-	//TODO: add your code here
-	return -1;
+	int count = 0;
+	Frame currFrame;
+	for (int iter = 0; iter < numFrames; iter++) {
+		currFrame = frames[iter];
+		if (currFrame.IsValid() && currFrame.GetPinCount() == 0) {
+			count++;
+		}
+	}
+	return count;
 }
 
 //--------------------------------------------------------------------
@@ -257,7 +290,13 @@ unsigned int BufMgr::GetNumOfUnpinnedFrames()
 //--------------------------------------------------------------------
 int BufMgr::FindFrame( PageID pid )
 {
-	//TODO: add your code here
+	Frame currFrame;
+	for (int iter = 0; iter < numFrames; iter++) {
+		currFrame = frames[iter];
+		if (currFrame.IsValid() && currFrame.GetPageID() == pid) {
+			return iter;
+		}
+	}
 	return INVALID_FRAME;
 }
 
