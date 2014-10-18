@@ -16,7 +16,9 @@
 //--------------------------------------------------------------------
 BufMgr::BufMgr(int bufSize, const char* replacementPolicy)
 {
+	//std::cout << "Create buffer with size  " << bufSize << std::endl;
 	numFrames = bufSize;
+
 	frames = new Frame [numFrames];
 	
 	if (strcmpi(replacementPolicy, "LRU") == 0) 
@@ -37,6 +39,7 @@ BufMgr::BufMgr(int bufSize, const char* replacementPolicy)
 //--------------------------------------------------------------------
 BufMgr::~BufMgr()
 {   
+	//std::cout << "Destroying buffer" << std::endl;
 	FlushAllPages();
 	delete [] frames;
 	delete replacer;
@@ -63,14 +66,15 @@ BufMgr::~BufMgr()
 //--------------------------------------------------------------------
 Status BufMgr::PinPage(PageID pid, Page*& page, bool isEmpty)
 {
+	//std::cout << "Pin PageID " << pid << std::endl;
 	totalCall++;
 
 	// Check if the page is in the buffer pool
 	bool inPool = false;
-	Frame currFrame;
+	Frame* currFrame;
 	for (int iter = 0; iter < numFrames; iter++) {
-		currFrame = frames[iter];
-		if (currFrame.IsValid() && currFrame.GetPageID() == pid){
+		currFrame = &frames[iter];
+		if (currFrame->IsValid() && currFrame->GetPageID() == pid){
 			inPool = true;
 			totalHit++;
 			break;
@@ -79,16 +83,16 @@ Status BufMgr::PinPage(PageID pid, Page*& page, bool isEmpty)
 
 	if (inPool){
 		// Increase its pin count and set output page pointer
-		currFrame.Pin();
-		page = currFrame.GetPage();
+		currFrame->Pin();
+		page = currFrame->GetPage();
 	}
 	else {
 		
 		// Find the first free frame if there is one
 		bool foundEmptyFrame = false;
 		for (int iter = 0; iter < numFrames; iter++) {
-			currFrame = frames[iter];
-			if (!currFrame.IsValid()){
+			currFrame = &frames[iter];
+			if (!currFrame->IsValid()){
 				foundEmptyFrame = true;
 				break;
 			}
@@ -105,24 +109,24 @@ Status BufMgr::PinPage(PageID pid, Page*& page, bool isEmpty)
 
 			// Get a pointer to the frame we just flushed
 			for (int iter = 0; iter < numFrames; iter++) {
-				currFrame = frames[iter];
-				if (currFrame.IsValid() && currFrame.GetPageID() == replacedPageID){
+				currFrame = &frames[iter];
+				if (currFrame->IsValid() && currFrame->GetPageID() == replacedPageID){
 					break;
 				}
 			}
 		}
 
-		currFrame.SetPageID(pid);
-		currFrame.Pin();
+		currFrame->SetPageID(pid);
+		currFrame->Pin();
 
 		// If the page is not empty, read it in from disk
-		if (!isEmpty && currFrame.Read(pid) != OK) {
+		if (!isEmpty && currFrame->Read(pid) != OK) {
 			page = NULL;
 			return FAIL;
 		}
 		
 
-		page = currFrame.GetPage();
+		page = currFrame->GetPage();
 	}
 
 	return OK;
@@ -144,16 +148,16 @@ Status BufMgr::PinPage(PageID pid, Page*& page, bool isEmpty)
 //--------------------------------------------------------------------
 Status BufMgr::UnpinPage(PageID pid, bool dirty)
 {
-
+	//std::cout << "Unpinning page  " << pid << " Dirty?: " << dirty << std::endl;
 	int frameIndex = FindFrame(pid);
 	if (frameIndex == INVALID_FRAME) return FAIL;
 
-	Frame targetFrame = frames[frameIndex];
-	if (!targetFrame.NotPinned()) return FAIL;
+	Frame* targetFrame = &frames[frameIndex];
+	if (targetFrame->NotPinned()) return FAIL;
 
-	if (dirty) targetFrame.DirtyIt();
+	if (dirty) targetFrame->DirtyIt();
 
-	targetFrame.Unpin();
+	targetFrame->Unpin();
 
 	return OK;
 }
@@ -179,14 +183,15 @@ Status BufMgr::UnpinPage(PageID pid, bool dirty)
 //--------------------------------------------------------------------
 Status BufMgr::NewPage (PageID& firstPid, Page*& firstPage, int howMany)
 {
+	//std::cout << "New Page Request" << std::endl;
 	// Condition Checks
 	if (howMany <= 0) return FAIL;
 
 	bool foundEmptyFrame = false;
-	Frame currFrame;
+	Frame* currFrame;
 	for (int iter = 0; iter < numFrames; iter++) {
-		currFrame = frames[iter];
-		if (!currFrame.IsValid()){
+		currFrame = &frames[iter];
+		if (!currFrame->IsValid()){
 			foundEmptyFrame = true;
 			break;
 		}
@@ -231,12 +236,14 @@ Status BufMgr::NewPage (PageID& firstPid, Page*& firstPage, int howMany)
 //--------------------------------------------------------------------
 Status BufMgr::FreePage(PageID pid)
 {
-	Frame targetFrame;
+	//std::cout << "Free page:  " << pid << std::endl;
+
+	Frame* targetFrame;
 	int frameIndex = FindFrame(pid);
 	if (frameIndex != INVALID_PAGE) {
-		targetFrame = frames[frameIndex];
+		targetFrame = &frames[frameIndex];
 
-		if (targetFrame.GetPinCount() > 1) return FAIL;
+		if (targetFrame->GetPinCount() > 1) return FAIL;
 		
 		UnpinPage(pid, true);
 		FlushPage(pid);
@@ -263,18 +270,19 @@ Status BufMgr::FreePage(PageID pid)
 //--------------------------------------------------------------------
 Status BufMgr::FlushPage(PageID pid)
 {
+	//std::cout << "Flush Page  " << pid << std::endl;
 	int frameIndex = FindFrame(pid);
 	if (frameIndex == INVALID_FRAME) return FAIL;
 
-	Frame targetFrame = frames[frameIndex];
-	if(!targetFrame.IsValid() || !targetFrame.NotPinned()) return FAIL;
+	Frame* targetFrame = &frames[frameIndex];
+	if(!targetFrame->IsValid() || !targetFrame->NotPinned()) return FAIL;
 
-	if (targetFrame.IsDirty()){
-		if (targetFrame.Write() != OK) return FAIL;
+	if (targetFrame->IsDirty()){
+		if (targetFrame->Write() != OK) return FAIL;
 		numDirtyPageWrites++;
 	}
 	
-	targetFrame.EmptyIt();
+	targetFrame->EmptyIt();
 
 	return OK;
 } 
@@ -294,21 +302,21 @@ Status BufMgr::FlushPage(PageID pid)
 Status BufMgr::FlushAllPages()
 {
 	bool failedOnce = false;
-	Frame currFrame;
+	Frame* currFrame;
 	for (int iter = 0; iter < numFrames; iter++) {
-		currFrame = frames[iter];
-		if (currFrame.IsValid()) {
+		currFrame = &frames[iter];
+		if (currFrame->IsValid()) {
 			// Check that the frame is not pinned
-			if (!currFrame.NotPinned()){
+			if (!currFrame->NotPinned()){
 				failedOnce = true;
 			}
 
-				if (currFrame.IsDirty()){
-					if (currFrame.Write() != OK) failedOnce = true;
+				if (currFrame->IsDirty()){
+					if (currFrame->Write() != OK) failedOnce = true;
 					numDirtyPageWrites++;
 				}
 
-			currFrame.EmptyIt();
+			currFrame->EmptyIt();
 		}
 	}
 	return (failedOnce) ? FAIL : OK;
@@ -329,10 +337,10 @@ Status BufMgr::FlushAllPages()
 unsigned int BufMgr::GetNumOfUnpinnedFrames()
 {
 	int count = 0;
-	Frame currFrame;
+	Frame* currFrame;
 	for (int iter = 0; iter < numFrames; iter++) {
-		currFrame = frames[iter];
-		if (currFrame.IsValid() && currFrame.GetPinCount() == 0) {
+		currFrame = &frames[iter];
+		if (currFrame->IsValid() && currFrame->GetPinCount() == 0) {
 			count++;
 		}
 	}
@@ -352,10 +360,10 @@ unsigned int BufMgr::GetNumOfUnpinnedFrames()
 //--------------------------------------------------------------------
 int BufMgr::FindFrame( PageID pid )
 {
-	Frame currFrame;
+	Frame* currFrame;
 	for (int iter = 0; iter < numFrames; iter++) {
-		currFrame = frames[iter];
-		if (currFrame.IsValid() && currFrame.GetPageID() == pid) {
+		currFrame = &frames[iter];
+		if (currFrame->IsValid() && currFrame->GetPageID() == pid) {
 			return iter;
 		}
 	}

@@ -8,7 +8,7 @@ Frame::Frame() {
 }
 
 Frame::~Frame() {
-    delete data;
+	delete data;
 }
 
 void Frame::Pin() {
@@ -34,7 +34,7 @@ void Frame::DirtyIt() {
 }
 
 void Frame::SetPageID(PageID pid) {
-	pid = pid;
+	this->pid = pid;
 }
 
 bool Frame::IsDirty() {
