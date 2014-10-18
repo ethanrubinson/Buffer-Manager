@@ -231,8 +231,18 @@ Status BufMgr::NewPage (PageID& firstPid, Page*& firstPage, int howMany)
 //--------------------------------------------------------------------
 Status BufMgr::FreePage(PageID pid)
 {
-	//TODO: add your code here
-	return FAIL;
+	Frame targetFrame;
+	int frameIndex = FindFrame(pid);
+	if (frameIndex != INVALID_PAGE) {
+		targetFrame = frames[frameIndex];
+
+		if (targetFrame.GetPinCount() > 1) return FAIL;
+		
+		UnpinPage(pid);
+		targetFrame.EmptyIt();
+	}
+	
+	return MINIBASE_DB->DeallocatePage(pid);
 }
 
 
