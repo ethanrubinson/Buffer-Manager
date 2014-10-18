@@ -4,14 +4,13 @@ Frame::Frame() {
 	pinCount = 0;
 	dirty = false;
 	pid = INVALID_PAGE;
-	data = new Page(); //This will always point to something. 
+	data = new Page();
 }
 
 Frame::~Frame() {
     delete data;
 }
 
-// TODO: Do we need to check if this has a page?
 void Frame::Pin() {
 	pinCount++;
 }
@@ -42,26 +41,18 @@ bool Frame::IsDirty() {
 	return dirty;
 }
 
-// Returns false if Frame is empty
 bool Frame::IsValid() {
     return (pid != INVALID_PAGE);
 }
     
-// TODO
 Status Frame::Write() {
-    MINIBASE_DB->WritePage(pid, data); //What page constitutes disk?
-    EmptyIt();
-	return OK;
+   return MINIBASE_DB->WritePage(pid, data);
 }
 
 Status Frame::Read(PageID pid){ 
-    SetPageID(pid);
-    MINIBASE_DB->ReadPage(pid, data);
-    DirtyIt();
-    return OK;
+   return MINIBASE_DB->ReadPage(pid, data);
 }
     
-// Returns true if not pinned
 bool Frame::NotPinned() {
 	return pinCount == 0;
 }

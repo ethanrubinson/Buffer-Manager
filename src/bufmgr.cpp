@@ -238,7 +238,7 @@ Status BufMgr::FreePage(PageID pid)
 
 		if (targetFrame.GetPinCount() > 1) return FAIL;
 		
-		UnpinPage(pid);
+		UnpinPage(pid, true);
 		FlushPage(pid);
 	}
 	
