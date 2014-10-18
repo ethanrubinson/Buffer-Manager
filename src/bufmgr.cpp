@@ -16,7 +16,6 @@
 //--------------------------------------------------------------------
 BufMgr::BufMgr(int bufSize, const char* replacementPolicy)
 {
-	//std::cout << "Create buffer with size  " << bufSize << std::endl;
 	numFrames = bufSize;
 
 	frames = new Frame [numFrames];
@@ -39,7 +38,6 @@ BufMgr::BufMgr(int bufSize, const char* replacementPolicy)
 //--------------------------------------------------------------------
 BufMgr::~BufMgr()
 {   
-	//std::cout << "Destroying buffer" << std::endl;
 	FlushAllPages();
 	delete [] frames;
 	delete replacer;
@@ -183,7 +181,6 @@ Status BufMgr::UnpinPage(PageID pid, bool dirty)
 //--------------------------------------------------------------------
 Status BufMgr::NewPage (PageID& firstPid, Page*& firstPage, int howMany)
 {
-	//std::cout << "New Page Request" << std::endl;
 	// Condition Checks
 	if (howMany <= 0) return FAIL;
 
@@ -340,10 +337,11 @@ unsigned int BufMgr::GetNumOfUnpinnedFrames()
 	Frame* currFrame;
 	for (int iter = 0; iter < numFrames; iter++) {
 		currFrame = &frames[iter];
-		if (currFrame->IsValid() && currFrame->GetPinCount() == 0) {
+		if (currFrame->NotPinned()) {
 			count++;
 		}
 	}
+
 	return count;
 }
 

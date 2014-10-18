@@ -1,10 +1,10 @@
 #include "frame.h"
 
 Frame::Frame() {
-	pinCount = 0;
-	dirty = false;
 	pid = INVALID_PAGE;
 	data = new Page();
+	pinCount = 0;
+	dirty = false;
 }
 
 Frame::~Frame() {
@@ -27,6 +27,7 @@ void Frame::EmptyIt() {
     pid = INVALID_PAGE;
     pinCount = 0;
     dirty = false;
+	// Do we need to wipe the data?
 }
 
 void Frame::DirtyIt() {
