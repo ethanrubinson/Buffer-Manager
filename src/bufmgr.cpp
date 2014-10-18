@@ -63,8 +63,63 @@ BufMgr::~BufMgr()
 //--------------------------------------------------------------------
 Status BufMgr::PinPage(PageID pid, Page*& page, bool isEmpty)
 {
-	//TODO: add your code here
-	return FAIL;
+	totalCall++;
+
+	// Check if the page is in the buffer pool
+	bool inPool = false;
+	Frame currFrame;
+	for (int iter = 0; iter < numFrames; iter++) {
+		currFrame = frames[iter];
+		if (currFrame.IsValid() && currFrame.GetPageID() == pid){
+			inPool = true;
+			totalHit++;
+			break;
+		}
+	}
+
+	if (inPool){
+		// Increase its pin count and set output page pointer
+		currFrame.Pin();
+		page = currFrame.GetPage();
+	}
+	else {
+		
+		// Find the first free frame if there is one
+		bool foundEmptyFrame = false;
+		for (int iter = 0; iter < numFrames; iter++) {
+			currFrame = frames[iter];
+			if (!currFrame.IsValid()){
+				foundEmptyFrame = true;
+				break;
+			}
+		}
+		
+		if (!foundEmptyFrame) {
+		
+			// Find a page to evict based on our replacement policy
+			int replacedPageID = replacer->PickVictim();
+			if(FlushPage(replacedPageID) != OK) return FAIL;
+
+			// Get a pointer to the frame we just flushed
+			for (int iter = 0; iter < numFrames; iter++) {
+				currFrame = frames[iter];
+				if (currFrame.IsValid() && currFrame.GetPageID() == replacedPageID){
+					break;
+				}
+			}
+		}
+
+		currFrame.SetPageID(pid);
+		currFrame.Pin();
+
+		// If the page is not empty, read it in from disk
+		if (!isEmpty && currFrame.Read(pid) != OK) return FAIL;
+		
+
+		page = currFrame.GetPage();
+	}
+
+	return OK;
 } 
 
 //--------------------------------------------------------------------
