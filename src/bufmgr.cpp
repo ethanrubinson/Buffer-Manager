@@ -223,8 +223,11 @@ Status BufMgr::FlushPage(PageID pid)
 	Frame targetFrame = frames[frameIndex];
 	if(!targetFrame.IsValid() || !targetFrame.NotPinned()) return FAIL;
 
-	if (targetFrame.IsDirty() && targetFrame.Write() != OK) return FAIL;
-
+	if (targetFrame.IsDirty()){
+		if (targetFrame.Write() != OK) return FAIL;
+		numDirtyPageWrites++;
+	}
+	
 	targetFrame.EmptyIt();
 
 	return OK;
@@ -254,7 +257,10 @@ Status BufMgr::FlushAllPages()
 				failedOnce = true;
 			}
 
-			if (currFrame.IsDirty() && currFrame.Write() != OK) failedOnce = true;
+				if (currFrame.IsDirty()){
+					if (currFrame.Write() != OK) failedOnce = true;
+					numDirtyPageWrites++;
+				}
 
 			currFrame.EmptyIt();
 		}
