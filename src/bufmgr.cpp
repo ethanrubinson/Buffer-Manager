@@ -138,8 +138,18 @@ Status BufMgr::PinPage(PageID pid, Page*& page, bool isEmpty)
 //--------------------------------------------------------------------
 Status BufMgr::UnpinPage(PageID pid, bool dirty)
 {
-	//TODO: add your code here
-	return FAIL;
+
+	int frameIndex = FindFrame(pid);
+	if (frameIndex == INVALID_FRAME) return FAIL;
+
+	Frame targetFrame = frames[frameIndex];
+	if (!targetFrame.NotPinned()) return FAIL;
+
+	if (dirty) targetFrame.DirtyIt();
+
+	targetFrame.Unpin();
+
+	return OK;
 }
 
 //--------------------------------------------------------------------
