@@ -239,7 +239,7 @@ Status BufMgr::FreePage(PageID pid)
 		if (targetFrame.GetPinCount() > 1) return FAIL;
 		
 		UnpinPage(pid);
-		targetFrame.EmptyIt();
+		FlushPage(pid);
 	}
 	
 	return MINIBASE_DB->DeallocatePage(pid);
