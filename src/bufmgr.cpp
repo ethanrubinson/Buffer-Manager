@@ -192,7 +192,7 @@ Status BufMgr::NewPage (PageID& firstPid, Page*& firstPage, int howMany)
 		}
 	}
 
-	if (foundEmptyFrame) return FAIL;
+	if (!foundEmptyFrame) return FAIL;
 
 	// Allocate the pages
 
