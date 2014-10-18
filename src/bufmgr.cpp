@@ -98,7 +98,10 @@ Status BufMgr::PinPage(PageID pid, Page*& page, bool isEmpty)
 		
 			// Find a page to evict based on our replacement policy
 			int replacedPageID = replacer->PickVictim();
-			if(FlushPage(replacedPageID) != OK) return FAIL;
+			if(FlushPage(replacedPageID) != OK) { 
+				page = NULL;
+				return FAIL;
+			}
 
 			// Get a pointer to the frame we just flushed
 			for (int iter = 0; iter < numFrames; iter++) {
@@ -113,7 +116,10 @@ Status BufMgr::PinPage(PageID pid, Page*& page, bool isEmpty)
 		currFrame.Pin();
 
 		// If the page is not empty, read it in from disk
-		if (!isEmpty && currFrame.Read(pid) != OK) return FAIL;
+		if (!isEmpty && currFrame.Read(pid) != OK) {
+			page = NULL;
+			return FAIL;
+		}
 		
 
 		page = currFrame.GetPage();
@@ -173,8 +179,38 @@ Status BufMgr::UnpinPage(PageID pid, bool dirty)
 //--------------------------------------------------------------------
 Status BufMgr::NewPage (PageID& firstPid, Page*& firstPage, int howMany)
 {
-	//TODO: add your code here
-	return FAIL;
+	// Condition Checks
+	if (howMany <= 0) return FAIL;
+
+	bool foundEmptyFrame = false;
+	Frame currFrame;
+	for (int iter = 0; iter < numFrames; iter++) {
+		currFrame = frames[iter];
+		if (!currFrame.IsValid()){
+			foundEmptyFrame = true;
+			break;
+		}
+	}
+
+	if (foundEmptyFrame) return FAIL;
+
+	// Allocate the pages
+
+	if (MINIBASE_DB->AllocatePage(firstPid, howMany) != OK) {
+		firstPid = INVALID_PAGE;
+		firstPage = NULL;
+		return FAIL;
+	}
+
+	if (PinPage(firstPid,firstPage,true) != OK) {
+		MINIBASE_DB->DeallocatePage(firstPid, howMany);
+		firstPid = INVALID_PAGE;
+		firstPage = NULL;
+		return FAIL;
+	}
+
+
+	return OK;
 }
 
 //--------------------------------------------------------------------
