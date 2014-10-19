@@ -76,7 +76,10 @@
     <ClCompile Include="src\bmtest.cpp" />
     <ClCompile Include="src\bufmgr.cpp" />
     <ClCompile Include="src\db.cpp" />
+    <ClCompile Include="src\frame.cpp" />
+    <ClCompile Include="src\lru.cpp" />
     <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\mru.cpp" />
     <ClCompile Include="src\replacer.cpp" />
     <ClCompile Include="src\test.cpp" />
   </ItemGroup>
