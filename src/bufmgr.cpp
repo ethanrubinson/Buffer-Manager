@@ -17,7 +17,6 @@
 BufMgr::BufMgr(int bufSize, const char* replacementPolicy)
 {
 	numFrames = bufSize;
-
 	frames = new Frame [numFrames];
 	
 	if (strcmpi(replacementPolicy, "LRU") == 0) 
@@ -64,8 +63,6 @@ BufMgr::~BufMgr()
 //--------------------------------------------------------------------
 Status BufMgr::PinPage(PageID pid, Page*& page, bool isEmpty)
 {
-	//std::cout << "Pin PageID " << pid << std::endl;
-
 	if(pid == INVALID_PAGE) return FAIL;
 
 	totalCall++;
@@ -103,7 +100,6 @@ Status BufMgr::PinPage(PageID pid, Page*& page, bool isEmpty)
 		
 			// Find a page to evict based on our replacement policy
 			int replacedPageID = replacer->PickVictim();
-			////std::cout << "Want to evict page: " << replacedPageID << std::endl;
 
 			// Get a pointer to the frame we will flush
 			for (int iter = 0; iter < numFrames; iter++) {
@@ -114,7 +110,6 @@ Status BufMgr::PinPage(PageID pid, Page*& page, bool isEmpty)
 			}
 
 			if(FlushPage(replacedPageID) != OK) { 
-				////std::cout << "Failed to flush victim page" << std::endl;
 				page = NULL;
 				return FAIL;
 			}
@@ -125,7 +120,6 @@ Status BufMgr::PinPage(PageID pid, Page*& page, bool isEmpty)
 
 		// If the page is not empty, read it in from disk
 		if (!isEmpty && currFrame->Read(pid) != OK) {
-			////std::cout << "failed to read" << std::endl;
 			page = NULL;
 			return FAIL;
 		}
