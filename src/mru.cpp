@@ -22,7 +22,7 @@ int MRU::PickVictim() {
 
 void MRU::AddFrame(int f) {
 	frameChain->remove(f);
-	frameChain->push_front(f);
+	frameChain->push_back(f);
 }
 
 void MRU::RemoveFrame(int f) {
